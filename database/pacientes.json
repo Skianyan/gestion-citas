@@ -1,0 +1,18 @@
+[
+  {
+    "id": "P001",
+    "nombre": "María González",
+    "edad": 35,
+    "telefono": "555-0101",
+    "email": "maria.g@email.com",
+    "fechaRegistro": "2025-01-15"
+  },
+  {
+    "id": "P002",
+    "nombre": "Mario Mario",
+    "edad": 35,
+    "telefono": "555-0101",
+    "email": "mario@bros.com",
+    "fechaRegistro": "2025-11-09"
+  }
+]
