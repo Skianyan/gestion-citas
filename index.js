@@ -8,9 +8,12 @@ const {
     obtenerCitas,
     obtenerCitaPorId,
     crearCita,
+    cancelarCita,
+    obtenerCitasPorDoctor,
     obtenerDoctores,
     obtenerDoctorPorId,
     crearDoctor,
+    obtenerDoctoresPorEspecialidad,
 } = require('./dbHelper');
 
 const app = express();
@@ -40,6 +43,50 @@ app.post('/api/pacientes', (req, res) => {
             success: false,
             message: 'Es necesario llenar todos los campos.'
         })
+    }
+
+    if (isNaN(edad)) {
+        return res.status(400).json({
+            success: false,
+            message: 'La edad debe ser un numero.'
+        })
+    }
+
+    if (!telefono || telefono.trim().length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'El teléfono es obligatorio.'
+        });
+    }
+
+    // Validar longitud mínima del teléfono
+    if (telefono.trim().length < 8) {
+        return res.status(400).json({
+            success: false,
+            message: 'El teléfono debe tener al menos 8 caracteres.'
+        });
+    }
+
+    if (parseInt(edad) <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'La edad debe ser mayor a 0.'
+        });
+    }
+
+    if (parseInt(edad) > 120) {
+        return res.status(400).json({
+            success: false,
+            message: 'La edad no puede ser mayor a 120 años.'
+        });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'El formato del email no es válido.'
+        });
     }
 
     const nuevo = crearPaciente(nombre, edad, telefono, email);
@@ -148,6 +195,79 @@ app.get('/api/citas/:id', (req, res) => {
     res.json({ success: true, data: cita });
 });
 
+app.put('/api/citas/:id/cancelar', (req, res) => {
+    try {
+        const citaId = req.params.id;
+
+        if (!citaId) {
+            return res.status(400).json({
+                success: false,
+                message: 'se requiere el ID de la cita a cancelar'
+            });
+        }
+
+        const citaCancelada = cancelarCita(citaId);
+
+        if (!citaCancelada) {
+            return res.status(404).json({
+                success: false,
+                message: 'Cita no encontrada'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Cita cancelada con exito',
+            data: citaCancelada
+        });
+    } catch (error) {
+        console.error('Error en endpoint /citas/:id/cancelar:', error)
+
+        res.status(500).json({
+            success: false,
+            message: 'Error al cancelar la cita',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
+});
+
+app.get('/api/citas/doctor/:doctorId', (req, res) => {
+    try {
+        const doctorId = req.params.doctorId;
+
+        if (!doctorId) {
+            return res.status(400).json({
+                success: false,
+                message: 'ID de doctor no proporcionado'
+            });
+        }
+
+        const agendaDoctor = obtenerCitasPorDoctor(doctorId);
+        
+        res.json({
+            success: true,
+            message: `Agenda de ${agendaDoctor.doctor.nombre}`,
+            data: agendaDoctor
+        });
+    } catch (error) {
+        console.error('Error en endpoint /citas/doctor/:doctorId:', error);
+        
+        // Manejar error específico de doctor no encontrado
+        if (error.message.includes('Doctor no encontrado')) {
+            return res.status(404).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener la agenda del doctor',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
+});
+
 
 // METODOS DOCTORES
 
@@ -173,6 +293,39 @@ app.get('/api/doctores/:id', (req, res) => {
     if (!doctor) return res.status(404).json(); // 
     res.json({ success: true, data: doctor });
 });
+
+app.get('/api/doctores/especialidad/:especialidad', (req, res) => {
+    try {
+        const especialidad = req.params.especialidad;
+        
+        if (!especialidad || especialidad.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere especificar la especialidad'
+            });
+        }
+
+        const doctores = obtenerDoctoresPorEspecialidad(especialidad);
+        
+        res.json({
+            success: true,
+            message: `Doctores encontrados en ${especialidad}`,
+            data: {
+                especialidadBuscada: especialidad,
+                doctores: doctores,
+                totalDoctores: doctores.length
+            }
+        });
+    } catch (error) {
+        console.error('Error en endpoint /doctores/especialidad:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al buscar doctores por especialidad',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
+});
+
 
 // METODOS FINALES
 

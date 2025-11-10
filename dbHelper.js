@@ -8,6 +8,36 @@ const DB_PATHS = {
     pacientes: path.join(__dirname, 'database/pacientes.json')
 };
 
+// FUNCIONES DE VALIDACION
+
+const validarEmailUnico = (email) => {
+try {
+    const db = leerDB('pacientes');
+    const pacienteExistente = db.find(paciente => 
+        paciente.email.toLowerCase() === email.toLowerCase()
+    );
+    return !pacienteExistente; // Retorna true si el email es único
+} catch (error) {
+    console.error('Error al validar email único:', error);
+    throw new Error('Error al validar el email');
+}
+};
+
+const validarEdad = (edad) => {
+    return edad > 0 && edad <= 120; // Edad entre 1 y 120 años
+};
+
+const validarFormatoEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+const validarTelefono = (telefono) => {
+    // Validar que el teléfono tenga al menos 8 caracteres
+    return telefono && telefono.trim().length >= 8;
+};
+
+
 // METODOS GENERICOS LECTURA Y ESCRITURA
 const leerDB = (tipo) => {
     try {
@@ -20,7 +50,7 @@ const leerDB = (tipo) => {
         return JSON.parse(data);
     } catch (error) {
         console.log(`Error al leer la base de datos ${tipo}:`, error);
-        // Retornar array vacío por defecto para todos los tipos
+        // Retornar array vacío por default
         return [];
     }
 };
@@ -54,7 +84,24 @@ const obtenerPacientePorId = (id) => {
 }
 
 const crearPaciente = (nombre, edad, telefono, email) => {
-    const db = leerDB("pacientes");
+    // Validaciones antes de crear el paciente
+    if (!validarTelefono(telefono)) {
+        throw new Error('El teléfono es obligatorio y de al menos 8 caracteres');
+    }
+
+    if (!validarEdad(edad)) {
+        throw new Error('La edad debe ser mayor a 0 y menor o igual a 120 años');
+    }
+
+    if (!validarFormatoEmail(email)) {
+        throw new Error('El formato del email no es válido');
+    }
+
+    if (!validarEmailUnico(email)) {
+        throw new Error('El email ya está registrado en el sistema');
+    }
+
+    const db = leerDB('pacientes');
 
     let nuevoId;
     if (db.length === 0) {
@@ -68,16 +115,21 @@ const crearPaciente = (nombre, edad, telefono, email) => {
     const nuevoPaciente = { 
         id: nuevoId, 
         nombre, 
-        edad, 
-        telefono, 
-        email,
+        edad: parseInt(edad), // Asegurar que sea número
+        telefono: telefono.trim(), // Limpiar espacios
+        email: email.toLowerCase().trim(), // Normalizar email
         fechaRegistro: new Date().toISOString().split('T')[0]
     };
+    
     db.push(nuevoPaciente);
-
-    escribirDB("pacientes", db);
+    
+    if (!escribirDB('pacientes', db)) {
+        throw new Error('Error al guardar el paciente en la base de datos');
+    }
+    
     return nuevoPaciente;
 };
+
 
 const actualizarPaciente = (id, nombre, edad, telefono, email) => {
     const db = leerDB("pacientes");
@@ -160,6 +212,21 @@ const crearDoctor = (nombre, especialidad, horarioInicio, horarioFin, diasDispon
     return nuevoDoctor;
 };
 
+const obtenerDoctoresPorEspecialidad = (especialidad) => {
+    try {
+        const doctores = leerDB('doctores');
+        
+        const doctoresFiltrados = doctores.filter(doctor => 
+            doctor.especialidad.toLowerCase().includes(especialidad.toLowerCase())
+        );
+        
+        return doctoresFiltrados;
+    } catch (error) {
+        console.error('Error al obtener doctores por especialidad:', error);
+        throw new Error('Error al obtener doctores por especialidad');
+    }
+};
+
 // Métodos específicos para CITAS
 const obtenerCitas = () => {
     return leerDB('citas');
@@ -197,6 +264,78 @@ const crearCita = (pacienteId, doctorId, fecha, hora, motivo, estado = 'programa
     return nuevaCita;
 };
 
+const cancelarCita = (id) => {
+    try {
+        const db = leerDB('citas');
+        const index = db.findIndex(cita => cita.id === id);
+        
+        if (index === -1) {
+            return null;
+        }
+
+        if (db[index].estado === 'cancelada') {
+            throw new Error('La cita ya está cancelada');
+        }
+
+        // actualizar estado a "cancelada"
+        db[index] = {
+            ...db[index],
+            estado: 'cancelada',
+            fechaCancelacion: new Date().toISOString().split('T')[0] // fecha de cancelación
+        };
+        
+        if (!escribirDB('citas', db)) {
+            throw new Error('Error al guardar los cambios de la cita');
+        }
+        
+        return db[index];
+    } catch (error) {
+        console.error('Error al cancelar cita:', error);
+        throw new Error(error.message || 'Error al cancelar la cita');
+    }
+};
+
+const obtenerCitasPorDoctor = (doctorId) => {
+    try {
+        const citas = leerDB('citas');
+        const pacientes = leerDB('pacientes');
+        const doctores = leerDB('doctores');
+        
+        // Verificar que el doctor existe
+        const doctor = doctores.find(d => d.id === doctorId);
+        if (!doctor) {
+            throw new Error('Doctor no encontrado');
+        }
+
+        // Filtrar citas del doctor, adjuntar info de paciente
+        const citasDoctor = citas
+            .filter(cita => cita.doctorId === doctorId)
+            .map(cita => {
+                const paciente = pacientes.find(p => p.id === cita.pacienteId);
+                return {
+                    ...cita,
+                    pacienteNombre: paciente ? paciente.nombre : 'Paciente no encontrado',
+                    pacienteEdad: paciente ? paciente.edad : 'No disponible',
+                    pacienteTelefono: paciente ? paciente.telefono : 'No disponible',
+                    pacienteEmail: paciente ? paciente.email : 'No disponible'
+                };
+            })
+
+        return {
+            doctor: {
+                id: doctor.id,
+                nombre: doctor.nombre,
+                especialidad: doctor.especialidad,
+                horario: `${doctor.horarioInicio} - ${doctor.horarioFin}`,
+                diasDisponibles: doctor.diasDisponibles
+            },
+            citas: citasDoctor,
+        };
+    } catch (error) {
+        console.error('Error al obtener citas por doctor:', error);
+        throw new Error(error.message || 'Error al obtener las citas del doctor');
+    }
+};
 
 // EXPORTACION DE METODOS
 
@@ -209,7 +348,10 @@ module.exports = {
     obtenerCitas,
     obtenerCitaPorId,
     crearCita,
+    cancelarCita,
+    obtenerCitasPorDoctor,
     obtenerDoctores,
     obtenerDoctorPorId,
     crearDoctor,
+    obtenerDoctoresPorEspecialidad,
 };

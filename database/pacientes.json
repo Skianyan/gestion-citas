@@ -14,5 +14,13 @@
     "telefono": "555-0101",
     "email": "mario@bros.com",
     "fechaRegistro": "2025-11-09"
+  },
+  {
+    "id": "P003",
+    "nombre": "Testy Testerson",
+    "edad": 25,
+    "telefono": "555-0122",
+    "email": "test@me.com",
+    "fechaRegistro": "2025-11-10"
   }
 ]
