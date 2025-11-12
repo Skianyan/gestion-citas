@@ -25,5 +25,18 @@
       "Miércoles",
       "Viernes"
     ]
+  },
+  {
+    "id": "D003",
+    "nombre": "Dra. Teto Kasane",
+    "especialidad": "Dentista",
+    "horarioInicio": "09:00",
+    "horarioFin": "17:00",
+    "diasDisponibles": [
+      "Lunes",
+      "Martes",
+      "Miércoles",
+      "Viernes"
+    ]
   }
 ]

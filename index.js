@@ -44,7 +44,8 @@ app.post('/api/pacientes', (req, res) => {
             message: 'Es necesario llenar todos los campos.'
         })
     }
-
+    
+    // validaciones
     if (isNaN(edad)) {
         return res.status(400).json({
             success: false,
@@ -52,6 +53,7 @@ app.post('/api/pacientes', (req, res) => {
         })
     }
 
+    // verificar si telefono es incluido
     if (!telefono || telefono.trim().length === 0) {
         return res.status(400).json({
             success: false,
@@ -59,21 +61,21 @@ app.post('/api/pacientes', (req, res) => {
         });
     }
 
-    // Validar longitud mínima del teléfono
+    //verificar si el telefono es 8 caracteres o mayor
     if (telefono.trim().length < 8) {
         return res.status(400).json({
             success: false,
             message: 'El teléfono debe tener al menos 8 caracteres.'
         });
     }
-
+    // edad mayor a 0
     if (parseInt(edad) <= 0) {
         return res.status(400).json({
             success: false,
             message: 'La edad debe ser mayor a 0.'
         });
     }
-
+    // edad menor a 120 (valor arbitrario)
     if (parseInt(edad) > 120) {
         return res.status(400).json({
             success: false,
@@ -81,6 +83,7 @@ app.post('/api/pacientes', (req, res) => {
         });
     }
 
+    // regex de formato de correo
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         return res.status(400).json({
@@ -175,13 +178,76 @@ app.get('/api/pacientes/:id/historial', (req, res) => {
 // METODOS CITAS
 
 app.post('/api/citas', (req, res) => {
-    const {pacienteId, doctorId, fecha, hora, motivo} = req.body;
-    const nueva = crearCita(pacienteId, doctorId, fecha, hora, motivo);
-    res.status(201).json({ 
-        success: true, 
-        message: "cita creada exitosamente" , 
-        data: nueva 
-    });
+    try {
+        const {pacienteId, doctorId, fecha, hora, motivo} = req.body;
+
+        // Validaciones básicas de campos obligatorios
+        if (!pacienteId || !doctorId || !fecha || !hora || !motivo){
+            return res.status(400).json({
+                success: false,
+                message: 'Es necesario llenar todos los campos: pacienteId, doctorId, fecha, hora y motivo.'
+            });
+        }
+
+        // Validar formato de fecha (YYYY-MM-DD)
+        const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!fechaRegex.test(fecha)) {
+            return res.status(400).json({
+                success: false,
+                message: 'El formato de fecha debe ser YYYY-MM-DD'
+            });
+        }
+
+        // Validar formato de hora (HH:MM)
+        const horaRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!horaRegex.test(hora)) {
+            return res.status(400).json({
+                success: false,
+                message: 'El formato de hora debe ser HH:MM (24 horas)'
+            });
+        }
+
+        // Validar que la fecha sea futura
+        const fechaCita = new Date(fecha);
+        const fechaActual = new Date();
+        fechaActual.setHours(0, 0, 0, 0);
+
+        if (fechaCita < fechaActual) {
+            return res.status(400).json({
+                success: false,
+                message: 'La fecha de la cita debe ser futura'
+            });
+        }
+
+        const nueva = crearCita(pacienteId, doctorId, fecha, hora, motivo);
+
+        res.status(201).json({
+            success: true,
+            message: "Cita creada exitosamente",
+            data: nueva
+        });
+    } catch (error) {
+        console.error('Error al crear cita:', error);
+        
+        // Manejar errores específicos de validación
+        if (error.message.includes('paciente no existe') ||
+            error.message.includes('doctor no existe') ||
+            error.message.includes('fecha debe ser futura') ||
+            error.message.includes('no trabaja los') ||
+            error.message.includes('hora debe estar dentro') ||
+            error.message.includes('ya existe una cita')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor al crear cita',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
 });
 
 app.get('/api/citas', (req, res) => {
@@ -272,9 +338,93 @@ app.get('/api/citas/doctor/:doctorId', (req, res) => {
 // METODOS DOCTORES
 
 app.post('/api/doctores', (req, res) => {
-    const {nombre, especialidad, horarioInicio, horarioFin, diasDisponibles} = req.body;
-    const nuevo = crearDoctor(nombre, especialidad, horarioInicio, horarioFin, diasDisponibles);
-    res.status(201).json({ success: true, data: nuevo });
+    try {
+        const {nombre, especialidad, horarioInicio, horarioFin, diasDisponibles} = req.body;
+            // Validaciones generales
+        // Campos obligatorios
+        if (!nombre || !especialidad || !horarioInicio || !horarioFin || !diasDisponibles){
+            return res.status(400).json({
+                success: false,
+                message: 'Es necesario llenar todos los campos: nombre, especialidad, horarioInicio, horarioFin y diasDisponibles.'
+            });
+        }
+        
+            // Validaciones de Dias
+        // Validar que diasDisponibles sea un array
+        if (!Array.isArray(diasDisponibles)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Los días disponibles deben ser un array.'
+            });
+        }
+
+        // Validar que el array de días no esté vacío
+        if (diasDisponibles.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Los días disponibles no pueden estar vacíos.'
+            });
+        }
+
+        const diasValidos = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+        const diasInvalidos = diasDisponibles.filter(dia => !diasValidos.includes(dia));
+        
+        if (diasInvalidos.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Días no válidos: ${diasInvalidos.join(', ')}. Los días válidos son: ${diasValidos.join(', ')}.`
+            });
+        }
+
+            // Validaciones de horario
+        // Validar formato de horarios
+        const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timeRegex.test(horarioInicio) || !timeRegex.test(horarioFin)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Los horarios deben tener formato HH:MM (24 horas).'
+            });
+        }
+
+        // Validar que horarioInicio sea menor que horarioFin
+        const [inicioHoras, inicioMinutos] = horarioInicio.split(':').map(Number);
+        const [finHoras, finMinutos] = horarioFin.split(':').map(Number);
+        const inicioTotalMinutos = inicioHoras * 60 + inicioMinutos;
+        const finTotalMinutos = finHoras * 60 + finMinutos;
+
+        if (inicioTotalMinutos >= finTotalMinutos) {
+            return res.status(400).json({
+                success: false,
+                message: 'El horario de inicio debe ser anterior al horario de fin.'
+            });
+        }
+
+        const nuevo = crearDoctor(nombre, especialidad, horarioInicio, horarioFin, diasDisponibles);
+
+        res.status(201).json({
+            success: true,
+            message: "Doctor creado exitosamente",
+            data: nuevo
+        });
+    } catch (error) {
+        console.error('Error al crear doctor:', error);
+        
+        // Manejar errores específicos de validación
+        if (error.message.includes('Ya existe un doctor') ||
+            error.message.includes('horarios no son válidos') ||
+            error.message.includes('días disponibles no pueden estar vacíos')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor al crear doctor',
+            error: process.env.NODE_ENV === 'development' ? error.message : {} // solo mostrar en dev
+        });
+    }
 });
 
 app.get('/api/doctores', (req, res) => {

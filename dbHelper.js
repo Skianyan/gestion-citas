@@ -8,7 +8,7 @@ const DB_PATHS = {
     pacientes: path.join(__dirname, 'database/pacientes.json')
 };
 
-// FUNCIONES DE VALIDACION
+// FUNCIONES DE VALIDACION (paciente)
 
 const validarEmailUnico = (email) => {
 try {
@@ -35,6 +35,155 @@ const validarFormatoEmail = (email) => {
 const validarTelefono = (telefono) => {
     // Validar que el teléfono tenga al menos 8 caracteres
     return telefono && telefono.trim().length >= 8;
+};
+
+// FUNCIONES DE VALIDACION (doctores)
+
+const validarDoctorUnico = (nombre, especialidad) => {
+    try {
+        const db = leerDB('doctores');
+        const doctorExistente = db.find(doctor => 
+            doctor.nombre.toLowerCase() === nombre.toLowerCase() &&
+            doctor.especialidad.toLowerCase() === especialidad.toLowerCase()
+        );
+        return !doctorExistente; // Retorna true si el doctor es único
+    } catch (error) {
+        console.error('Error al validar doctor único:', error);
+        throw new Error('Error al validar el doctor');
+    }
+};
+
+const validarHorarios = (horarioInicio, horarioFin) => {
+    // Validar formato HH:MM
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    
+    if (!timeRegex.test(horarioInicio) || !timeRegex.test(horarioFin)) {
+        return false;
+    }
+    
+    // Convertir a minutos para comparar
+    const [inicioHoras, inicioMinutos] = horarioInicio.split(':').map(Number);
+    const [finHoras, finMinutos] = horarioFin.split(':').map(Number);
+    
+    const inicioTotalMinutos = inicioHoras * 60 + inicioMinutos;
+    const finTotalMinutos = finHoras * 60 + finMinutos;
+    
+    return inicioTotalMinutos < finTotalMinutos;
+};
+
+const validarDiasDisponibles = (diasDisponibles) => {
+    if (!Array.isArray(diasDisponibles) || diasDisponibles.length === 0) {
+        return false;
+    }
+    
+    // Validar que todos los días sean válidos
+    const diasValidos = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    return diasDisponibles.every(dia => diasValidos.includes(dia));
+};
+
+// VALIDACION CITAS
+
+const validarPacienteExiste = (pacienteId) => {
+    try {
+        const db = leerDB('pacientes');
+        const paciente = db.find(p => p.id === pacienteId);
+        return !!paciente;
+    } catch (error) {
+        console.error('Error al validar paciente:', error);
+        throw new Error('Error al validar el paciente');
+    }
+};
+
+const validarDoctorExiste = (doctorId) => {
+    try {
+        const db = leerDB('doctores');
+        const doctor = db.find(d => d.id === doctorId);
+        return !!doctor;
+    } catch (error) {
+        console.error('Error al validar doctor:', error);
+        throw new Error('Error al validar el doctor');
+    }
+};
+
+const validarFechaFutura = (fecha) => {
+    const fechaCita = new Date(fecha);
+    const fechaActual = new Date();
+    fechaActual.setHours(0, 0, 0, 0); // Resetear horas para comparar solo fecha
+    
+    return fechaCita >= fechaActual;
+};
+
+const validarDiaDisponibleDoctor = (doctorId, fecha) => {
+    try {
+        const db = leerDB('doctores');
+        const doctor = db.find(d => d.id === doctorId);
+        
+        if (!doctor) {
+            return false;
+        }
+        
+        // Obtener día de la semana en español
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const fechaObj = new Date(fecha);
+        const diaSemana = diasSemana[fechaObj.getDay()];
+        
+        return doctor.diasDisponibles.includes(diaSemana);
+    } catch (error) {
+        console.error('Error al validar día disponible:', error);
+        throw new Error('Error al validar disponibilidad del doctor');
+    }
+};
+
+const validarHorarioDoctor = (doctorId, hora) => {
+    try {
+        const db = leerDB('doctores');
+        const doctor = db.find(d => d.id === doctorId);
+        
+        if (!doctor) {
+            return false;
+        }
+        
+        // Convertir horarios a minutos para comparar
+        const [horaCitaHoras, horaCitaMinutos] = hora.split(':').map(Number);
+        const [inicioHoras, inicioMinutos] = doctor.horarioInicio.split(':').map(Number);
+        const [finHoras, finMinutos] = doctor.horarioFin.split(':').map(Number);
+        
+        const horaCitaMinutosTotal = horaCitaHoras * 60 + horaCitaMinutos;
+        const inicioMinutosTotal = inicioHoras * 60 + inicioMinutos;
+        const finMinutosTotal = finHoras * 60 + finMinutos;
+        
+        return horaCitaMinutosTotal >= inicioMinutosTotal && horaCitaMinutosTotal <= finMinutosTotal;
+    } catch (error) {
+        console.error('Error al validar horario doctor:', error);
+        throw new Error('Error al validar horario del doctor');
+    }
+};
+
+const validarCitaUnica = (doctorId, fecha, hora, citaIdExcluir = null) => {
+    try {
+        const db = leerDB('citas');
+        
+        // Buscar citas existentes para el mismo doctor, misma fecha y hora
+        const citaExistente = db.find(cita => 
+            cita.doctorId === doctorId &&
+            cita.fecha === fecha &&
+            cita.hora === hora &&
+            cita.estado !== 'cancelada' && // No considerar citas canceladas
+            cita.id !== citaIdExcluir // Excluir la cita actual en actualizaciones
+        );
+        
+        return !citaExistente;
+    } catch (error) {
+        console.error('Error al validar cita única:', error);
+        throw new Error('Error al validar disponibilidad de la cita');
+    }
+};
+
+// para comparar con 
+const obtenerDiaSemana = (fecha) => {
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const fechaObj = new Date(fecha);
+    return diasSemana[fechaObj.getDay()];
 };
 
 
@@ -187,6 +336,19 @@ const obtenerDoctorPorId = (id) => {
 }
 
 const crearDoctor = (nombre, especialidad, horarioInicio, horarioFin, diasDisponibles) => {
+    // Validaciones antes de crear el doctor
+    if (!validarDoctorUnico(nombre, especialidad)) {
+        throw new Error('Ya existe un doctor con el mismo nombre y especialidad');
+    }
+
+    if (!validarHorarios(horarioInicio, horarioFin)) {
+        throw new Error('Los horarios no son válidos. El horario de inicio debe iniciar antes que el horario de fin y deben tener formato HH:MM');
+    }
+
+    if (!validarDiasDisponibles(diasDisponibles)) {
+        throw new Error('Los días disponibles no pueden estar vacíos y deben ser días válidos');
+    }
+
     const db = leerDB('doctores');
 
     let nuevoId;
@@ -200,18 +362,21 @@ const crearDoctor = (nombre, especialidad, horarioInicio, horarioFin, diasDispon
 
     const nuevoDoctor = { 
         id: nuevoId, 
-        nombre, 
-        especialidad, 
-        horarioInicio, 
-        horarioFin, 
-        diasDisponibles 
+        nombre: nombre.trim(),
+        especialidad: especialidad.trim(),
+        horarioInicio: horarioInicio.trim(),
+        horarioFin: horarioFin.trim(),
+        diasDisponibles: diasDisponibles.map(dia => dia.trim())
     };
     
     db.push(nuevoDoctor);
-    escribirDB('doctores', db);
+    
+    if (!escribirDB('doctores', db)) {
+        throw new Error('Error al guardar el doctor en la base de datos');
+    }
+    
     return nuevoDoctor;
 };
-
 const obtenerDoctoresPorEspecialidad = (especialidad) => {
     try {
         const doctores = leerDB('doctores');
@@ -238,6 +403,33 @@ const obtenerCitaPorId = (id) => {
 }
 
 const crearCita = (pacienteId, doctorId, fecha, hora, motivo, estado = 'programada') => {
+    // Validaciones antes de crear la cita
+    if (!validarPacienteExiste(pacienteId)) {
+        throw new Error('El paciente no existe en el sistema');
+    }
+
+    if (!validarDoctorExiste(doctorId)) {
+        throw new Error('El doctor no existe en el sistema');
+    }
+
+    if (!validarFechaFutura(fecha)) {
+        throw new Error('La fecha de la cita debe ser futura');
+    }
+
+    if (!validarDiaDisponibleDoctor(doctorId, fecha)) {
+        const diaSemana = obtenerDiaSemana(fecha);
+        throw new Error(`El doctor no trabaja los ${diaSemana}`);
+    }
+
+    if (!validarHorarioDoctor(doctorId, hora)) {
+        const doctor = obtenerDoctorPorId(doctorId);
+        throw new Error(`La hora debe estar dentro del horario del doctor (${doctor.horarioInicio} - ${doctor.horarioFin})`);
+    }
+
+    if (!validarCitaUnica(doctorId, fecha, hora)) {
+        throw new Error('Ya existe una cita programada para este doctor en la misma fecha y hora');
+    }
+
     const db = leerDB('citas');
 
     let nuevoId;
@@ -260,7 +452,11 @@ const crearCita = (pacienteId, doctorId, fecha, hora, motivo, estado = 'programa
     };
     
     db.push(nuevaCita);
-    escribirDB('citas', db);
+    
+    if (!escribirDB('citas', db)) {
+        throw new Error('Error al guardar la cita en la base de datos');
+    }
+    
     return nuevaCita;
 };
 
@@ -277,11 +473,14 @@ const cancelarCita = (id) => {
             throw new Error('La cita ya está cancelada');
         }
 
-        // actualizar estado a "cancelada"
+        if (db[index].estado === 'completada') {
+            throw new Error('No se puede cancelar una cita ya completada');
+        }
+
         db[index] = {
             ...db[index],
             estado: 'cancelada',
-            fechaCancelacion: new Date().toISOString().split('T')[0] // fecha de cancelación
+            fechaCancelacion: new Date().toISOString().split('T')[0]
         };
         
         if (!escribirDB('citas', db)) {
