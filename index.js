@@ -16,6 +16,8 @@ const {
     obtenerDoctoresPorEspecialidad,
     obtenerDocConMasCitas,
     obtenerEspecialidadPopular,
+    buscarCitasConFiltros,
+    verificarDisponibilidadDoctores,
 } = require('./dbHelper');
 
 const app = express();
@@ -253,8 +255,47 @@ app.post('/api/citas', (req, res) => {
 });
 
 app.get('/api/citas', (req, res) => {
-    const citas = obtenerCitas();
-    res.json({ success: true, data: citas });
+    try {
+        // ver si pasaron parametros adicionales
+        const { fecha, estado, doctorId, pacienteId, mes, anio, especialidad } = req.query;
+        
+        const tieneFiltros = fecha || estado || doctorId || pacienteId || mes || anio || especialidad;
+        
+        if (tieneFiltros) {
+            // busqueda con filtros
+            const filtros = {};
+            
+            if (fecha) filtros.fecha = fecha;
+            if (estado) filtros.estado = estado;
+            if (doctorId) filtros.doctorId = doctorId;
+            if (pacienteId) filtros.pacienteId = pacienteId;
+            if (mes) filtros.mes = parseInt(mes);
+            if (anio) filtros.anio = parseInt(anio);
+            if (especialidad) filtros.especialidad = especialidad;
+            
+            const resultado = buscarCitasConFiltros(filtros);
+            
+            return res.json({
+                success: true,
+                message: `Búsqueda de citas con filtros aplicados (${resultado.citas.length} resultados)`,
+                data: resultado
+            });
+        } else {
+            // si no hay filtros obtener todas las citas
+            const citas = obtenerCitas();
+            return res.json({
+                success: true,
+                data: citas
+            });
+        }
+    } catch (error) {
+        console.error('Error al obtener citas:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener la lista de citas',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
 });
 
 app.get('/api/citas/:id', (req, res) => {
@@ -478,14 +519,77 @@ app.get('/api/doctores/especialidad/:especialidad', (req, res) => {
     }
 });
 
+app.get('/api/doctores/disponibles', (req, res) => {
+    try {
+        console.log('Solicitud recibida en /api/doctores/disponibles');
+        console.log('Query parameters:', req.query);
+        
+        const { fecha, hora, especialidad } = req.query;
+        
+        // Validar parámetros requeridos
+        if (!fecha || !hora) {
+            console.log('Error: Faltan parámetros requeridos');
+            return res.status(400).json({
+                success: false,
+                message: 'Los parámetros fecha y hora son requeridos. Ejemplo: /doctores/disponibles?fecha=2025-11-10&hora=10:00',
+                ejemplo: {
+                    url: '/api/doctores/disponibles?fecha=2025-11-10&hora=10:00',
+                    parametros: {
+                        fecha: 'YYYY-MM-DD',
+                        hora: 'HH:MM',
+                        especialidad: 'opcional'
+                    }
+                }
+            });
+        }
+        
+        console.log('Procesando solicitud para:', { fecha, hora, especialidad });
+        
+        const resultado = verificarDisponibilidadDoctores(fecha, hora, especialidad);
+        
+        console.log('Resultado obtenido, enviando respuesta...');
+        
+        res.json({
+            success: true,
+            message: `Disponibilidad de doctores para el ${resultado.diaSemana} ${fecha} a las ${hora}`,
+            data: resultado
+        });
+        
+    } catch (error) {
+        console.error('Error completo en endpoint /doctores/disponibles:', error);
+        console.error('Stack trace:', error.stack);
+        
+        // Manejar errores específicos de validación
+        if (error.message.includes('Fecha y hora son requeridas') ||
+            error.message.includes('Formato de fecha inválido') ||
+            error.message.includes('Formato de hora inválido') ||
+            error.message.includes('fechas pasadas')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                ayuda: 'Use el formato: /api/doctores/disponibles?fecha=2025-11-10&hora=10:00'
+            });
+        }
+        
+        // Error interno del servidor
+        res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor al verificar disponibilidad',
+            error: process.env.NODE_ENV === 'development' ? error.message : 'Contacte al administrador'
+        });
+    }
+});
+
+
 // METODOS ESTADISTICAS
 
 app.get('/api/estadisticas/doctores', (req, res) => {
     try{
-        const estadistica = obtenerDocConMasCitas()
+        const docNum = obtenerDocConMasCitas()
+        const docPop = obtenerDoctorPorId('D00' + Object.values(docNum))
         res.json({ 
             success: true, 
-            data: estadistica });
+            data: docPop });
     }
     catch {
         console.error('Error en endpoint /estadisticas/doctores', error);
@@ -498,20 +602,57 @@ app.get('/api/estadisticas/doctores', (req, res) => {
 });
 
 app.get('/api/estadisticas/especialidades', (req, res) => {
-    try{
-        const especialidadPopular = obtenerEspecialidadPopular()
-        res.json({ 
-            success: true, 
-            data: estadistica });
-    }
-    catch {
-        console.error('Error en endpoint /estadisticas/especialidades', error);
+  try {
+        const estadisticas = obtenerEspecialidadPopular();
+        
+        if (!estadisticas.especialidadMasSolicitada) {
+            return res.json({
+                success: true,
+                message: 'No hay suficientes datos para determinar la especialidad más solicitada',
+                data: {
+                    mensaje: 'No hay citas activas en el sistema',
+                    totalCitasSistema: 0
+                }
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: `Estadísticas de especialidades médicas`,
+            data: {
+                especialidadMasSolicitada: estadisticas.especialidadMasSolicitada,
+                totalCitasEspecialidad: estadisticas.totalCitas,
+                porcentajeDelTotal: estadisticas.porcentajeTotal,
+                doctoresDisponibles: {
+                    total: estadisticas.totalDoctores,
+                    lista: estadisticas.doctoresEspecialidad.map(doctor => ({
+                        id: doctor.id,
+                        nombre: doctor.nombre,
+                        horario: `${doctor.horarioInicio} - ${doctor.horarioFin}`,
+                        diasDisponibles: doctor.diasDisponibles
+                    }))
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error en endpoint /estadisticas/especialidades:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al conseguir las estadisticas de especialidades',
+            message: 'Error al obtener las estadísticas de especialidades',
             error: process.env.NODE_ENV === 'development' ? error.message : {}
         });
     }
+});
+
+app.get('/api/salud', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Servidor funcionando correctamente',
+        timestamp: new Date().toISOString(),
+        endpoints: {
+            doctores_disponibles: '/api/doctores/disponibles?fecha=2025-11-10&hora=10:00'
+        }
+    });
 });
 
 // METODOS FINALES

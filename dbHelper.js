@@ -564,29 +564,351 @@ const obtenerDocConMasCitas = () => {
 }
 
 const obtenerEspecialidadPopular = () => {
-    try{
+    try {
         const citas = leerDB('citas');
-
-        const numCitas = citas.reduce((accumulator, currentObject) => {
-            const keyValue = currentObject.doctorId; // Specify the key to count by
-
-            if (accumulator[keyValue]) {
-                accumulator[keyValue]++;
-            } else {
-                accumulator[keyValue] = 1;
-            }
-            return accumulator;
-        }, {});
-        var bestDoc = Math.max.apply(null,Object.keys(numCitas).map(function(x){ return numCitas[x] }));
-        return {
-            docID: bestDoc
+        const doctores = leerDB('doctores');
+        
+        // Filtrar solo citas programadas o completadas (no canceladas)
+        const citasActivas = citas.filter(cita => 
+            cita.estado === 'programada' || cita.estado === 'completada'
+        );
+        
+        if (citasActivas.length === 0) {
+            return {
+                especialidadMasSolicitada: null,
+                totalCitas: 0,
+                doctoresEspecialidad: [],
+                estadisticas: {}
+            };
         }
-    }catch{
-        console.error('Error al obtener doc con mas citas:', error);
-        throw new Error(error.message || 'Error al obtener las citas del doctor');
+        
+        // Contar citas por especialidad
+        const contadorEspecialidades = {};
+        
+        citasActivas.forEach(cita => {
+            const doctor = doctores.find(d => d.id === cita.doctorId);
+            if (doctor) {
+                const especialidad = doctor.especialidad;
+                contadorEspecialidades[especialidad] = (contadorEspecialidades[especialidad] || 0) + 1;
+            }
+        });
+        
+        // Encontrar la especialidad más solicitada
+        let especialidadMasSolicitada = null;
+        let maxCitas = 0;
+        
+        Object.entries(contadorEspecialidades).forEach(([especialidad, count]) => {
+            if (count > maxCitas) {
+                maxCitas = count;
+                especialidadMasSolicitada = especialidad;
+            }
+        });
+        
+        // Obtener todos los doctores de esa especialidad
+        const doctoresEspecialidad = doctores.filter(doctor => 
+            doctor.especialidad === especialidadMasSolicitada
+        );
+        
+        return {
+            especialidadMasSolicitada,
+            totalCitas: maxCitas,
+            doctoresEspecialidad,
+            totalDoctores: doctoresEspecialidad.length,
+        };
+    } catch (error) {
+        console.error('Error al obtener estadísticas de especialidades:', error);
+        throw new Error('Error al obtener las estadísticas de especialidades');
     }
+};
 
-}
+const buscarCitasConFiltros = (filtros = {}) => {
+    try {
+        let citas = leerDB('citas');
+        const pacientes = leerDB('pacientes');
+        const doctores = leerDB('doctores');
+        
+        // Aplicar filtros
+        if (filtros.fecha) {
+            citas = citas.filter(cita => cita.fecha === filtros.fecha);
+        }
+        
+        if (filtros.estado) {
+            citas = citas.filter(cita => cita.estado === filtros.estado);
+        }
+        
+        if (filtros.doctorId) {
+            citas = citas.filter(cita => cita.doctorId === filtros.doctorId);
+        }
+        
+        if (filtros.pacienteId) {
+            citas = citas.filter(cita => cita.pacienteId === filtros.pacienteId);
+        }
+        
+        if (filtros.mes) {
+            citas = citas.filter(cita => {
+                const fechaCita = new Date(cita.fecha);
+                const mesCita = fechaCita.getMonth() + 1; // Mes 1-12
+                return mesCita === parseInt(filtros.mes);
+            });
+        }
+        
+        if (filtros.anio) {
+            citas = citas.filter(cita => {
+                const fechaCita = new Date(cita.fecha);
+                return fechaCita.getFullYear() === parseInt(filtros.anio);
+            });
+        }
+        
+        if (filtros.especialidad) {
+            citas = citas.filter(cita => {
+                const doctor = doctores.find(d => d.id === cita.doctorId);
+                return doctor && doctor.especialidad.toLowerCase().includes(filtros.especialidad.toLowerCase());
+            });
+        }
+        
+        // Ordenar por fecha y hora (más recientes primero)
+        citas.sort((a, b) => {
+            const fechaA = new Date(a.fecha + ' ' + a.hora);
+            const fechaB = new Date(b.fecha + ' ' + b.hora);
+            return fechaB - fechaA; // Orden descendente (más recientes primero)
+        });
+        
+        // Enriquecer datos con información de pacientes y doctores
+        const citasEnriquecidas = citas.map(cita => {
+            const paciente = pacientes.find(p => p.id === cita.pacienteId);
+            const doctor = doctores.find(d => d.id === cita.doctorId);
+            
+            return {
+                ...cita,
+                pacienteNombre: paciente ? paciente.nombre : 'Paciente no encontrado',
+                pacienteEmail: paciente ? paciente.email : 'No disponible',
+                pacienteTelefono: paciente ? paciente.telefono : 'No disponible',
+                doctorNombre: doctor ? doctor.nombre : 'Doctor no encontrado',
+                doctorEspecialidad: doctor ? doctor.especialidad : 'Especialidad no disponible',
+                doctorHorario: doctor ? `${doctor.horarioInicio} - ${doctor.horarioFin}` : 'No disponible'
+            };
+        });
+        
+        // Estadísticas de los resultados filtrados
+        const estadisticas = {
+            total: citas.length,
+            porEstado: citas.reduce((acc, cita) => {
+                acc[cita.estado] = (acc[cita.estado] || 0) + 1;
+                return acc;
+            }, {}),
+            porFecha: citas.reduce((acc, cita) => {
+                acc[cita.fecha] = (acc[cita.fecha] || 0) + 1;
+                return acc;
+            }, {})
+        };
+        
+        return {
+            citas: citasEnriquecidas,
+            filtrosAplicados: filtros,
+            estadisticas: estadisticas,
+            metadatos: {
+                totalResultados: citas.length,
+                fechaConsulta: new Date().toISOString(),
+                parametrosUsados: Object.keys(filtros)
+            }
+        };
+    } catch (error) {
+        console.error('Error al buscar citas con filtros:', error);
+        throw new Error('Error al buscar citas con los filtros especificados');
+    }
+};
+
+const verificarDisponibilidadDoctores = (fecha, hora, especialidad = null) => {
+    try {
+        console.log('Verificando disponibilidad para:', { fecha, hora, especialidad });
+        
+        const doctores = leerDB('doctores');
+        const citas = leerDB('citas');
+        
+        // Validar parámetros requeridos
+        if (!fecha || !hora) {
+            throw new Error('Fecha y hora son requeridas');
+        }
+        
+        // Validar formato de fecha
+        const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!fechaRegex.test(fecha)) {
+            throw new Error('Formato de fecha inválido. Use YYYY-MM-DD');
+        }
+        
+        // Validar formato de hora
+        const horaRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!horaRegex.test(hora)) {
+            throw new Error('Formato de hora inválido. Use HH:MM (24 horas)');
+        }
+        
+        // Validar que la fecha no sea pasada
+        const fechaCita = new Date(fecha);
+        const fechaActual = new Date();
+        fechaActual.setHours(0, 0, 0, 0);
+        
+        if (fechaCita < fechaActual) {
+            throw new Error('No se puede verificar disponibilidad para fechas pasadas');
+        }
+        
+        // Obtener día de la semana
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const diaSemana = diasSemana[fechaCita.getDay()];
+        
+        console.log('Día de la semana:', diaSemana);
+        console.log('Total doctores:', doctores.length);
+        console.log('Total citas:', citas.length);
+        
+        // Filtrar doctores por especialidad si se especifica
+        let doctoresFiltrados = doctores;
+        if (especialidad) {
+            doctoresFiltrados = doctores.filter(doctor => 
+                doctor.especialidad.toLowerCase().includes(especialidad.toLowerCase())
+            );
+            console.log('Doctores después de filtrar por especialidad:', doctoresFiltrados.length);
+        }
+        
+        // Verificar disponibilidad para cada doctor
+        const doctoresDisponibles = [];
+        
+        for (const doctor of doctoresFiltrados) {
+            // Verificar que trabaje ese día
+            const trabajaEseDia = doctor.diasDisponibles.includes(diaSemana);
+            if (!trabajaEseDia) {
+                continue;
+            }
+            
+            // Verificar que la hora esté dentro de su horario
+            const [horaCitaHoras, horaCitaMinutos] = hora.split(':').map(Number);
+            const [inicioHoras, inicioMinutos] = doctor.horarioInicio.split(':').map(Number);
+            const [finHoras, finMinutos] = doctor.horarioFin.split(':').map(Number);
+            
+            const horaCitaMinutosTotal = horaCitaHoras * 60 + horaCitaMinutos;
+            const inicioMinutosTotal = inicioHoras * 60 + inicioMinutos;
+            const finMinutosTotal = finHoras * 60 + finMinutos;
+            
+            const horaDentroHorario = horaCitaMinutosTotal >= inicioMinutosTotal && 
+                                    horaCitaMinutosTotal <= finMinutosTotal;
+            if (!horaDentroHorario) {
+                continue;
+            }
+            
+            // Verificar que no tenga cita programada en esa fecha y hora
+            const tieneCita = citas.some(cita => 
+                cita.doctorId === doctor.id &&
+                cita.fecha === fecha &&
+                cita.hora === hora &&
+                cita.estado !== 'cancelada'
+            );
+            
+            if (!tieneCita) {
+                // Calcular citas del día para este doctor
+                const citasDelDia = citas.filter(cita => 
+                    cita.doctorId === doctor.id &&
+                    cita.fecha === fecha &&
+                    cita.estado !== 'cancelada'
+                );
+                
+                doctoresDisponibles.push({
+                    id: doctor.id,
+                    nombre: doctor.nombre,
+                    especialidad: doctor.especialidad,
+                    horario: `${doctor.horarioInicio} - ${doctor.horarioFin}`,
+                    diasDisponibles: doctor.diasDisponibles,
+                    disponible: true,
+                    siguienteDisponible: null,
+                    citasHoy: citasDelDia.length
+                });
+            } else {
+                // Doctor está ocupado, calcular siguiente disponibilidad
+                const citasDelDia = citas.filter(cita => 
+                    cita.doctorId === doctor.id &&
+                    cita.fecha === fecha &&
+                    cita.estado !== 'cancelada'
+                ).sort((a, b) => a.hora.localeCompare(b.hora));
+                
+                let siguienteDisponible = 'fin_de_jornada';
+                
+                // Buscar el siguiente horario disponible (asumiendo citas de 30 minutos)
+                const [horaActualHoras, horaActualMinutos] = hora.split(':').map(Number);
+                let siguienteHora = horaActualHoras;
+                let siguienteMinuto = horaActualMinutos + 30;
+                
+                if (siguienteMinuto >= 60) {
+                    siguienteHora += 1;
+                    siguienteMinuto -= 60;
+                }
+                
+                // Verificar que no exceda el horario del doctor
+                const finMinutosTotal = finHoras * 60 + finMinutos;
+                const siguienteMinutosTotal = siguienteHora * 60 + siguienteMinuto;
+                
+                if (siguienteMinutosTotal <= finMinutosTotal) {
+                    siguienteDisponible = `${siguienteHora.toString().padStart(2, '0')}:${siguienteMinuto.toString().padStart(2, '0')}`;
+                    
+                    // Verificar si ese horario también está ocupado
+                    const siguienteOcupado = citas.some(cita => 
+                        cita.doctorId === doctor.id &&
+                        cita.fecha === fecha &&
+                        cita.hora === siguienteDisponible &&
+                        cita.estado !== 'cancelada'
+                    );
+                    
+                    if (siguienteOcupado) {
+                        siguienteDisponible = 'consultar_horarios';
+                    }
+                }
+                
+                doctoresDisponibles.push({
+                    id: doctor.id,
+                    nombre: doctor.nombre,
+                    especialidad: doctor.especialidad,
+                    horario: `${doctor.horarioInicio} - ${doctor.horarioFin}`,
+                    diasDisponibles: doctor.diasDisponibles,
+                    disponible: false,
+                    siguienteDisponible: siguienteDisponible,
+                    citasHoy: citasDelDia.length
+                });
+            }
+        }
+        
+        console.log('Doctores disponibles encontrados:', doctoresDisponibles.length);
+        
+        // Estadísticas
+        const estadisticas = {
+            totalDoctores: doctoresFiltrados.length,
+            totalDisponibles: doctoresDisponibles.filter(d => d.disponible).length,
+            totalOcupados: doctoresDisponibles.filter(d => !d.disponible).length,
+            porcentajeDisponibilidad: doctoresFiltrados.length > 0 
+                ? ((doctoresDisponibles.filter(d => d.disponible).length / doctoresFiltrados.length) * 100).toFixed(2) + '%'
+                : '0.00%',
+            porEspecialidad: doctoresDisponibles.reduce((acc, doctor) => {
+                acc[doctor.especialidad] = (acc[doctor.especialidad] || 0) + 1;
+                return acc;
+            }, {})
+        };
+        
+        const resultado = {
+            fechaConsulta: fecha,
+            horaConsulta: hora,
+            diaSemana: diaSemana,
+            doctores: doctoresDisponibles,
+            estadisticas: estadisticas,
+            filtros: {
+                fecha,
+                hora,
+                especialidad: especialidad || 'todas'
+            }
+        };
+        
+        console.log('Resultado final:', resultado);
+        return resultado;
+        
+    } catch (error) {
+        console.error('Error detallado en verificarDisponibilidadDoctores:', error);
+        throw new Error(error.message || 'Error al verificar disponibilidad de doctores');
+    }
+};
 
 // EXPORTACION DE METODOS
 
@@ -607,4 +929,6 @@ module.exports = {
     obtenerDoctoresPorEspecialidad,
     obtenerDocConMasCitas,
     obtenerEspecialidadPopular,
+    buscarCitasConFiltros,
+    verificarDisponibilidadDoctores,
 };
