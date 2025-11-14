@@ -536,6 +536,58 @@ const obtenerCitasPorDoctor = (doctorId) => {
     }
 };
 
+// METODOS STATS
+
+const obtenerDocConMasCitas = () => {
+    try{
+        const citas = leerDB('citas');
+
+        const numCitas = citas.reduce((accumulator, currentObject) => {
+            const keyValue = currentObject.doctorId; // Specify the key to count by
+
+            if (accumulator[keyValue]) {
+                accumulator[keyValue]++;
+            } else {
+                accumulator[keyValue] = 1;
+            }
+            return accumulator;
+        }, {});
+        var bestDoc = Math.max.apply(null,Object.keys(numCitas).map(function(x){ return numCitas[x] }));
+        return {
+            docID: bestDoc
+        }
+    }catch{
+        console.error('Error al obtener doc con mas citas:', error);
+        throw new Error(error.message || 'Error al obtener las citas del doctor');
+    }
+
+}
+
+const obtenerEspecialidadPopular = () => {
+    try{
+        const citas = leerDB('citas');
+
+        const numCitas = citas.reduce((accumulator, currentObject) => {
+            const keyValue = currentObject.doctorId; // Specify the key to count by
+
+            if (accumulator[keyValue]) {
+                accumulator[keyValue]++;
+            } else {
+                accumulator[keyValue] = 1;
+            }
+            return accumulator;
+        }, {});
+        var bestDoc = Math.max.apply(null,Object.keys(numCitas).map(function(x){ return numCitas[x] }));
+        return {
+            docID: bestDoc
+        }
+    }catch{
+        console.error('Error al obtener doc con mas citas:', error);
+        throw new Error(error.message || 'Error al obtener las citas del doctor');
+    }
+
+}
+
 // EXPORTACION DE METODOS
 
 module.exports = {
@@ -553,4 +605,6 @@ module.exports = {
     obtenerDoctorPorId,
     crearDoctor,
     obtenerDoctoresPorEspecialidad,
+    obtenerDocConMasCitas,
+    obtenerEspecialidadPopular,
 };

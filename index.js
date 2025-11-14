@@ -14,6 +14,8 @@ const {
     obtenerDoctorPorId,
     crearDoctor,
     obtenerDoctoresPorEspecialidad,
+    obtenerDocConMasCitas,
+    obtenerEspecialidadPopular,
 } = require('./dbHelper');
 
 const app = express();
@@ -215,7 +217,7 @@ app.post('/api/citas', (req, res) => {
         if (fechaCita < fechaActual) {
             return res.status(400).json({
                 success: false,
-                message: 'La fecha de la cita debe ser futura'
+                message: 'La fecha de la cita debe ser una fecha futura'
             });
         }
 
@@ -476,6 +478,41 @@ app.get('/api/doctores/especialidad/:especialidad', (req, res) => {
     }
 });
 
+// METODOS ESTADISTICAS
+
+app.get('/api/estadisticas/doctores', (req, res) => {
+    try{
+        const estadistica = obtenerDocConMasCitas()
+        res.json({ 
+            success: true, 
+            data: estadistica });
+    }
+    catch {
+        console.error('Error en endpoint /estadisticas/doctores', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al conseguir las estadisticas de doctores',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
+});
+
+app.get('/api/estadisticas/especialidades', (req, res) => {
+    try{
+        const especialidadPopular = obtenerEspecialidadPopular()
+        res.json({ 
+            success: true, 
+            data: estadistica });
+    }
+    catch {
+        console.error('Error en endpoint /estadisticas/especialidades', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al conseguir las estadisticas de especialidades',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
+});
 
 // METODOS FINALES
 
