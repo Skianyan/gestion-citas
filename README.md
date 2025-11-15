@@ -31,6 +31,7 @@ Documentación de la API
 POST /pacientes
 
 Body:
+
     {
         "nombre": "Andy Anderson",
         "edad": 25,
@@ -39,6 +40,7 @@ Body:
     }
 
 Respuesta Exitosa (201):
+
     {
         "success": true,
         "message": "Paciente creado exitosamente",
@@ -62,6 +64,7 @@ Errores 400:
 GET /pacientes
 
 Respuesta Exitosa (200):
+
     {
         "success": true,
         "data": [
