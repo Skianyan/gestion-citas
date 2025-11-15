@@ -1,7 +1,7 @@
 [
   {
     "id": "P001",
-    "nombre": "María Ramirez",
+    "nombre": "Vincent Franzetti",
     "edad": 35,
     "telefono": "555-0101",
     "email": "maria.r@hotmail.com",
@@ -9,7 +9,7 @@
   },
   {
     "id": "P002",
-    "nombre": "Mario Mario",
+    "nombre": "Joel Johansson",
     "edad": 35,
     "telefono": "555-0101",
     "email": "mario@bros.com",
@@ -17,7 +17,7 @@
   },
   {
     "id": "P003",
-    "nombre": "Testy Testerson",
+    "nombre": "Lai Mu",
     "edad": 25,
     "telefono": "555-0122",
     "email": "test@me.com",

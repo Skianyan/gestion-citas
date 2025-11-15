@@ -380,40 +380,40 @@ GET /citas/doctor/:doctorId
 Respuesta Exitosa (200):
 json
 
-{
-    "success": true,
-    "message": "Agenda del Dr. Carlos Méndez",
-    "data": {
-        "doctor": {
-        "id": "D001",
-        "nombre": "Dr. Carlos Méndez",
-        "especialidad": "Cardiología",
-        "horario": "09:00 - 17:00",
-        "diasDisponibles": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-        },
-        "citas": [
-        {
-            "id": "C001",
-            "pacienteId": "P001",
-            "doctorId": "D001",
-            "fecha": "2025-11-10",
-            "hora": "10:00",
-            "motivo": "Revisión general",
-            "estado": "programada",
-            "pacienteNombre": "María González",
-            "pacienteEdad": 35,
-            "pacienteTelefono": "555-0101",
-            "pacienteEmail": "maria.g@email.com"
-        }
-        ],
-        "estadisticas": {
-        "programadas": 1,
-        "completadas": 0,
-        "canceladas": 0,
-        "total": 1
+    {
+        "success": true,
+        "message": "Agenda del Dr. Carlos Méndez",
+        "data": {
+            "doctor": {
+            "id": "D001",
+            "nombre": "Dr. Carlos Méndez",
+            "especialidad": "Cardiología",
+            "horario": "09:00 - 17:00",
+            "diasDisponibles": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+            },
+            "citas": [
+            {
+                "id": "C001",
+                "pacienteId": "P001",
+                "doctorId": "D001",
+                "fecha": "2025-11-10",
+                "hora": "10:00",
+                "motivo": "Revisión general",
+                "estado": "programada",
+                "pacienteNombre": "María González",
+                "pacienteEdad": 35,
+                "pacienteTelefono": "555-0101",
+                "pacienteEmail": "maria.g@email.com"
+            }
+            ],
+            "estadisticas": {
+            "programadas": 1,
+            "completadas": 0,
+            "canceladas": 0,
+            "total": 1
+            }
         }
     }
-}
 
 GLOSARIO
 

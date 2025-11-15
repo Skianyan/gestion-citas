@@ -1,12 +1,11 @@
 [
   {
     "id": "D001",
-    "nombre": "Dr. Pepe Lepu",
+    "nombre": "Dr. Kagamine Len",
     "especialidad": "Cardiología",
-    "horarioInicio": "09:00",
-    "horarioFin": "17:00",
+    "horarioInicio": "07:00",
+    "horarioFin": "15:00",
     "diasDisponibles": [
-      "Lunes",
       "Martes",
       "Miércoles",
       "Jueves",
@@ -17,8 +16,8 @@
     "id": "D002",
     "nombre": "Dra. Hatsune Miku",
     "especialidad": "Dentista",
-    "horarioInicio": "09:00",
-    "horarioFin": "17:00",
+    "horarioInicio": "10:00",
+    "horarioFin": "18:00",
     "diasDisponibles": [
       "Lunes",
       "Martes",
@@ -35,7 +34,7 @@
     "diasDisponibles": [
       "Lunes",
       "Martes",
-      "Miércoles",
+      "Jueves",
       "Viernes"
     ]
   }
