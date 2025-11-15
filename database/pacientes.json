@@ -3,24 +3,24 @@
     "id": "P001",
     "nombre": "Vincent Franzetti",
     "edad": 35,
-    "telefono": "555-0101",
-    "email": "maria.r@hotmail.com",
+    "telefono": "676-676-7676",
+    "email": "vinny@vinesauce.com",
     "fechaRegistro": "2025-01-15"
   },
   {
     "id": "P002",
     "nombre": "Joel Johansson",
     "edad": 35,
-    "telefono": "555-0101",
-    "email": "mario@bros.com",
+    "telefono": "545-454-4545",
+    "email": "joel@vargskeletor.com",
     "fechaRegistro": "2025-11-09"
   },
   {
     "id": "P003",
     "nombre": "Lai Mu",
     "edad": 25,
-    "telefono": "555-0122",
-    "email": "test@me.com",
+    "telefono": "222-444-2222",
+    "email": "limes@gmail.com",
     "fechaRegistro": "2025-11-10"
   }
 ]

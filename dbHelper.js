@@ -820,7 +820,7 @@ const verificarDisponibilidadDoctores = (fecha, hora, especialidad = null) => {
                     citasHoy: citasDelDia.length
                 });
             } else {
-                // Doctor está ocupado, calcular siguiente disponibilidad
+                // Doctor está ocupado, calcular siguiente fecha
                 const citasDelDia = citas.filter(cita => 
                     cita.doctorId === doctor.id &&
                     cita.fecha === fecha &&
@@ -874,26 +874,11 @@ const verificarDisponibilidadDoctores = (fecha, hora, especialidad = null) => {
         
         console.log('Doctores disponibles encontrados:', doctoresDisponibles.length);
         
-        // Estadísticas
-        const estadisticas = {
-            totalDoctores: doctoresFiltrados.length,
-            totalDisponibles: doctoresDisponibles.filter(d => d.disponible).length,
-            totalOcupados: doctoresDisponibles.filter(d => !d.disponible).length,
-            porcentajeDisponibilidad: doctoresFiltrados.length > 0 
-                ? ((doctoresDisponibles.filter(d => d.disponible).length / doctoresFiltrados.length) * 100).toFixed(2) + '%'
-                : '0.00%',
-            porEspecialidad: doctoresDisponibles.reduce((acc, doctor) => {
-                acc[doctor.especialidad] = (acc[doctor.especialidad] || 0) + 1;
-                return acc;
-            }, {})
-        };
-        
         const resultado = {
             fechaConsulta: fecha,
             horaConsulta: hora,
             diaSemana: diaSemana,
             doctores: doctoresDisponibles,
-            estadisticas: estadisticas,
             filtros: {
                 fecha,
                 hora,
