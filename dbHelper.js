@@ -377,6 +377,105 @@ const crearDoctor = (nombre, especialidad, horarioInicio, horarioFin, diasDispon
     
     return nuevoDoctor;
 };
+
+const actualizarDoctor = (id, datosActualizados) => {
+    try {
+        console.log('Actualizando doctor:', { id, datosActualizados });
+        
+        const db = leerDB('doctores');
+        const index = db.findIndex(doctor => doctor.id === id);
+        
+        if (index === -1) {
+            console.log('Doctor no encontrado con ID:', id);
+            return null;
+        }
+
+        const doctorActual = db[index];
+        
+        // Extraer datos a actualizar
+        const { 
+            nombre, 
+            especialidad, 
+            horarioInicio, 
+            horarioFin, 
+            diasDisponibles 
+        } = datosActualizados;
+
+        // Validaciones
+        if (nombre !== undefined && (!nombre || nombre.trim() === '')) {
+            throw new Error('El nombre no puede estar vacío');
+        }
+
+        if (especialidad !== undefined && (!especialidad || especialidad.trim() === '')) {
+            throw new Error('La especialidad no puede estar vacía');
+        }
+
+        // Validar horarios si se están actualizando
+        if (horarioInicio !== undefined || horarioFin !== undefined) {
+            const horarioInicioActual = horarioInicio || doctorActual.horarioInicio;
+            const horarioFinActual = horarioFin || doctorActual.horarioFin;
+            
+            if (!validarHorarios(horarioInicioActual, horarioFinActual)) {
+                throw new Error('Los horarios no son válidos. El horario de inicio debe ser anterior al horario de fin y deben tener formato HH:MM');
+            }
+        }
+
+        // Validar días disponibles si se están actualizando
+        if (diasDisponibles !== undefined) {
+            if (!Array.isArray(diasDisponibles)) {
+                throw new Error('Los días disponibles deben ser un array');
+            }
+            
+            if (diasDisponibles.length === 0) {
+                throw new Error('Los días disponibles no pueden estar vacíos');
+            }
+
+            if (!validarDiasDisponibles(diasDisponibles)) {
+                throw new Error('Los días disponibles deben ser días válidos (Lunes, Martes, Miércoles, Jueves, Viernes, Sábado, Domingo)');
+            }
+        }
+
+        // Validar doctor único solo si cambió nombre o especialidad
+        const nombreCambio = nombre && nombre.trim() !== doctorActual.nombre;
+        const especialidadCambio = especialidad && especialidad.trim() !== doctorActual.especialidad;
+        
+        if (nombreCambio || especialidadCambio) {
+            const nombreFinal = nombre ? nombre.trim() : doctorActual.nombre;
+            const especialidadFinal = especialidad ? especialidad.trim() : doctorActual.especialidad;
+            
+            if (!validarDoctorUnico(nombreFinal, especialidadFinal, id)) {
+                throw new Error('Ya existe un doctor con el mismo nombre y especialidad');
+            }
+        }
+
+        // Actualizar solo los campos proporcionados
+        const doctorActualizado = {
+            ...doctorActual,
+            ...(nombre !== undefined && { nombre: nombre.trim() }),
+            ...(especialidad !== undefined && { especialidad: especialidad.trim() }),
+            ...(horarioInicio !== undefined && { horarioInicio: horarioInicio.trim() }),
+            ...(horarioFin !== undefined && { horarioFin: horarioFin.trim() }),
+            ...(diasDisponibles !== undefined && { 
+                diasDisponibles: diasDisponibles.map(dia => dia.trim()) 
+            }),
+            ultimaActualizacion: new Date().toISOString()
+        };
+        
+        db[index] = doctorActualizado;
+        
+        if (!escribirDB('doctores', db)) {
+            throw new Error('Error al guardar los cambios del doctor');
+        }
+        
+        console.log('Doctor actualizado exitosamente:', doctorActualizado);
+        return doctorActualizado;
+        
+    } catch (error) {
+        console.error('Error al actualizar doctor:', error);
+        throw new Error(error.message || 'Error al actualizar el doctor');
+    }
+};
+
 const obtenerDoctoresPorEspecialidad = (especialidad) => {
     try {
         const doctores = leerDB('doctores');
@@ -673,7 +772,7 @@ const buscarCitasConFiltros = (filtros = {}) => {
             return fechaB - fechaA; // Orden descendente (más recientes primero)
         });
         
-        // Enriquecer datos con información de pacientes y doctores
+        // Agregar datos del paciente y doctor a la cita
         const citasEnriquecidas = citas.map(cita => {
             const paciente = pacientes.find(p => p.id === cita.pacienteId);
             const doctor = doctores.find(d => d.id === cita.doctorId);
@@ -911,6 +1010,7 @@ module.exports = {
     obtenerDoctores,
     obtenerDoctorPorId,
     crearDoctor,
+    actualizarDoctor,
     obtenerDoctoresPorEspecialidad,
     obtenerDocConMasCitas,
     obtenerEspecialidadPopular,

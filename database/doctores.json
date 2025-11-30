@@ -6,29 +6,31 @@
     "horarioInicio": "07:00",
     "horarioFin": "15:00",
     "diasDisponibles": [
-      "Martes",
+      "Lunes",
       "Miércoles",
       "Jueves",
       "Viernes"
-    ]
+    ],
+    "ultimaActualizacion": "2025-11-30T05:44:55.922Z"
   },
   {
     "id": "D002",
     "nombre": "Dra. Hatsune Miku",
     "especialidad": "Dentista",
-    "horarioInicio": "10:00",
-    "horarioFin": "18:00",
+    "horarioInicio": "09:00",
+    "horarioFin": "17:00",
     "diasDisponibles": [
       "Lunes",
       "Martes",
       "Miércoles",
       "Viernes"
-    ]
+    ],
+    "ultimaActualizacion": "2025-11-30T05:36:40.525Z"
   },
   {
     "id": "D003",
     "nombre": "Dra. Teto Kasane",
-    "especialidad": "Dentista",
+    "especialidad": "Pediatría",
     "horarioInicio": "09:00",
     "horarioFin": "17:00",
     "diasDisponibles": [
@@ -36,6 +38,7 @@
       "Martes",
       "Jueves",
       "Viernes"
-    ]
+    ],
+    "ultimaActualizacion": "2025-11-30T05:45:02.958Z"
   }
 ]

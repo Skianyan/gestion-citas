@@ -2,7 +2,7 @@
   {
     "id": "P001",
     "nombre": "Vincent Franzetti",
-    "edad": 35,
+    "edad": 32,
     "telefono": "676-676-7676",
     "email": "vinny@vinesauce.com",
     "fechaRegistro": "2025-01-15"
@@ -22,5 +22,13 @@
     "telefono": "222-444-2222",
     "email": "limes@gmail.com",
     "fechaRegistro": "2025-11-10"
+  },
+  {
+    "id": "P004",
+    "nombre": "Lewis Brindley",
+    "edad": 42,
+    "telefono": "44 255 255 25",
+    "email": "yogscast@gmail.com",
+    "fechaRegistro": "2025-11-30"
   }
 ]

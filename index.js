@@ -1,4 +1,10 @@
 const express = require('express');
+const cors = require('cors');
+const app = express();
+const port = 3000;
+
+app.use(cors());
+
 const {
     obtenerPacientes,
     obtenerPacientePorId,
@@ -13,6 +19,7 @@ const {
     obtenerDoctores,
     obtenerDoctorPorId,
     crearDoctor,
+    actualizarDoctor,
     obtenerDoctoresPorEspecialidad,
     obtenerDocConMasCitas,
     obtenerEspecialidadPopular,
@@ -20,7 +27,7 @@ const {
     verificarDisponibilidadDoctores,
 } = require('./dbHelper');
 
-const app = express();
+
 
 // Definir el puerto
 const PORT = process.env.PORT || 3000;
@@ -45,7 +52,7 @@ app.post('/api/pacientes', (req, res) => {
     if (!nombre || !edad || !telefono || !email){
         return res.status(400).json({
             success: false,
-            message: 'Es necesario llenar todos los campos.'
+            message: 'Es necesario llenar todos los campos. nombre, edad, telefono y email'
         })
     }
     
@@ -481,10 +488,112 @@ app.get('/api/doctores/:id', (req, res) => {
     res.json({ success: true, data: doctor });
 });
 
-app.get('/api/doctores/:id', (req, res) => {
-    const doctor = obtenerDoctorPorId(req.params.id);
-    if (!doctor) return res.status(404).json(); // 
-    res.json({ success: true, data: doctor });
+app.put('/api/doctores/:id', (req, res) => {
+    try {
+        const doctorId = req.params.id;
+        const datosActualizados = req.body;
+
+        console.log('Solicitud de actualización para doctor:', doctorId);
+        console.log('Datos a actualizar:', datosActualizados);
+
+        // Validar que el ID esté presente
+        if (!doctorId) {
+            return res.status(400).json({
+                success: false,
+                message: 'ID del doctor es requerido'
+            });
+        }
+
+        // Validar que haya datos para actualizar
+        if (!datosActualizados || Object.keys(datosActualizados).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Se requieren datos para actualizar el doctor',
+                campos_posibles: [
+                    'nombre',
+                    'especialidad', 
+                    'horarioInicio',
+                    'horarioFin',
+                    'diasDisponibles'
+                ]
+            });
+        }
+
+        // Validar campos permitidos
+        const camposPermitidos = ['nombre', 'especialidad', 'horarioInicio', 'horarioFin', 'diasDisponibles'];
+        const camposNoPermitidos = Object.keys(datosActualizados).filter(campo => !camposPermitidos.includes(campo));
+        
+        if (camposNoPermitidos.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Campos no permitidos: ${camposNoPermitidos.join(', ')}`,
+                campos_permitidos: camposPermitidos
+            });
+        }
+
+        // Validaciones específicas para arrays
+        if (datosActualizados.diasDisponibles && !Array.isArray(datosActualizados.diasDisponibles)) {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo diasDisponibles debe ser un array'
+            });
+        }
+
+        // Validar formato de horarios si se proporcionan
+        if (datosActualizados.horarioInicio || datosActualizados.horarioFin) {
+            const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            
+            if (datosActualizados.horarioInicio && !timeRegex.test(datosActualizados.horarioInicio)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Formato de horarioInicio inválido. Use HH:MM (24 horas)'
+                });
+            }
+            
+            if (datosActualizados.horarioFin && !timeRegex.test(datosActualizados.horarioFin)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Formato de horarioFin inválido. Use HH:MM (24 horas)'
+                });
+            }
+        }
+
+        const doctorActualizado = actualizarDoctor(doctorId, datosActualizados);
+
+        if (!doctorActualizado) {
+            return res.status(404).json({
+                success: false,
+                message: 'Doctor no encontrado'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Doctor actualizado exitosamente',
+            data: doctorActualizado,
+            cambios: Object.keys(datosActualizados)
+        });
+
+    } catch (error) {
+        console.error('Error en endpoint PUT /api/doctores/:id:', error);
+        
+        // Manejar errores específicos de validación
+        if (error.message.includes('no puede estar vacío') ||
+            error.message.includes('no son válidos') ||
+            error.message.includes('deben ser días válidos') ||
+            error.message.includes('Ya existe un doctor')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error al actualizar el doctor',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
+    }
 });
 
 app.get('/api/doctores/especialidad/:especialidad', (req, res) => {
@@ -639,7 +748,7 @@ app.get('/api/estadisticas/especialidades', (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener las estadísticas de especialidades',
-            error: process.env.NODE_ENV === 'development' ? error.message : {}
+            error: error.message
         });
     }
 });
