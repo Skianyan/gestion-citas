@@ -34,7 +34,7 @@ const validarFormatoEmail = (email) => {
 
 const validarTelefono = (telefono) => {
     // Validar que el teléfono tenga al menos 8 caracteres
-    return telefono && telefono.trim().length >= 8;
+    return telefono && telefono.trim().length >= 10;
 };
 
 // FUNCIONES DE VALIDACION (doctores)
@@ -124,8 +124,9 @@ const validarDiaDisponibleDoctor = (doctorId, fecha) => {
         
         // Obtener día de la semana en español
         const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        const fechaObj = new Date(fecha);
-        const diaSemana = diasSemana[fechaObj.getDay()];
+        // CORRECCIÓN DE ZONA HORARIA: Usar mediodía UTC para evitar el desplazamiento de la fecha
+        const fechaObj = new Date(fecha + 'T12:00:00Z'); 
+        const diaSemana = diasSemana[fechaObj.getUTCDay()]; // Usar el día UTC
         
         return doctor.diasDisponibles.includes(diaSemana);
     } catch (error) {
@@ -152,6 +153,9 @@ const validarHorarioDoctor = (doctorId, hora) => {
         const inicioMinutosTotal = inicioHoras * 60 + inicioMinutos;
         const finMinutosTotal = finHoras * 60 + finMinutos;
         
+        // La hora debe ser igual o posterior al inicio Y estrictamente anterior al fin 
+        // (asumiendo que el fin es el final del turno, y las citas terminan antes).
+        // Usaremos <= finMinutosTotal para ser inclusivos.
         return horaCitaMinutosTotal >= inicioMinutosTotal && horaCitaMinutosTotal <= finMinutosTotal;
     } catch (error) {
         console.error('Error al validar horario doctor:', error);
@@ -182,8 +186,9 @@ const validarCitaUnica = (doctorId, fecha, hora, citaIdExcluir = null) => {
 // para comparar con 
 const obtenerDiaSemana = (fecha) => {
     const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    const fechaObj = new Date(fecha);
-    return diasSemana[fechaObj.getDay()];
+    // CORRECCIÓN DE ZONA HORARIA: Usar mediodía UTC
+    const fechaObj = new Date(fecha + 'T12:00:00Z');
+    return diasSemana[fechaObj.getUTCDay()];
 };
 
 
@@ -235,7 +240,7 @@ const obtenerPacientePorId = (id) => {
 const crearPaciente = (nombre, edad, telefono, email) => {
     // Validaciones antes de crear el paciente
     if (!validarTelefono(telefono)) {
-        throw new Error('El teléfono es obligatorio y de al menos 8 caracteres');
+        throw new Error('El teléfono es obligatorio y de al menos 10 caracteres');
     }
 
     if (!validarEdad(edad)) {
@@ -471,8 +476,24 @@ const actualizarDoctor = (id, datosActualizados) => {
         return doctorActualizado;
         
     } catch (error) {
-        console.error('Error al actualizar doctor:', error);
-        throw new Error(error.message || 'Error al actualizar el doctor');
+        console.error('Error en endpoint PUT /api/doctores/:id:', error);
+        
+        // Manejar errores específicos de validación
+        if (error.message.includes('no puede estar vacío') ||
+            error.message.includes('no son válidos') ||
+            error.message.includes('deben ser días válidos') ||
+            error.message.includes('Ya existe un doctor')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error al actualizar el doctor',
+            error: process.env.NODE_ENV === 'development' ? error.message : {}
+        });
     }
 };
 
@@ -852,7 +873,9 @@ const verificarDisponibilidadDoctores = (fecha, hora, especialidad = null) => {
         
         // Obtener día de la semana
         const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        const diaSemana = diasSemana[fechaCita.getDay()];
+        // CORRECCIÓN DE ZONA HORARIA: Usar mediodía UTC para evitar el desplazamiento de la fecha
+        const fechaObj = new Date(fecha + 'T12:00:00Z');
+        const diaSemana = diasSemana[fechaObj.getUTCDay()]; 
         
         console.log('Día de la semana:', diaSemana);
         console.log('Total doctores:', doctores.length);
@@ -887,7 +910,9 @@ const verificarDisponibilidadDoctores = (fecha, hora, especialidad = null) => {
             const finMinutosTotal = finHoras * 60 + finMinutos;
             
             const horaDentroHorario = horaCitaMinutosTotal >= inicioMinutosTotal && 
-                                    horaCitaMinutosTotal <= finMinutosTotal;
+                                    // La validación en el cliente usa < doctor.horarioFin, pero el backend es más inclusivo 
+                                    // para evitar fallos si el último minuto de trabajo se considera libre.
+                                    horaCitaMinutosTotal <= finMinutosTotal; 
             if (!horaDentroHorario) {
                 continue;
             }

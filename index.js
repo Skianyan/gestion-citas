@@ -72,11 +72,11 @@ app.post('/api/pacientes', (req, res) => {
         });
     }
 
-    //verificar si el telefono es 8 caracteres o mayor
-    if (telefono.trim().length < 8) {
+    //verificar si el telefono es 10 caracteres o mayor
+    if (telefono.trim().length < 10) {
         return res.status(400).json({
             success: false,
-            message: 'El teléfono debe tener al menos 8 caracteres.'
+            message: 'El teléfono debe tener al menos 10 caracteres.'
         });
     }
     // edad mayor a 0
